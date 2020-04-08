@@ -38,53 +38,55 @@ MAIL_ADDRESS = config.get('mail', 'MAIL_ADDRESS')
 MAIL_PASSWORD = config.get('mail', 'MAIL_PASSWORD')
 MAIL_TO_ADDRESS = config.get('mail', 'MAIL_TO_ADDRESS')
 
-def get_twitter_message(words, count):
+def get_twitter_message(q_words, count):
     #twitter auth.
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
     api = tweepy.API(auth)
     # search
     list_text = []
-    for word in words:
-        now = datetime.datetime.now()
-        tweets = api.search(q=word, result_type = 'recent', count=count)
-        next_max_id = tweets[-1].id
+    query = q_words
+    now = datetime.datetime.now()
+    #print(query)
+    tweets = api.search(q=query, result_type = 'recent', count=count)
+    next_max_id = tweets[-1].id
 
-        for tweet in tweets:
-            list_text.append(tweet.text)
+    for tweet in tweets:
+        list_text.append(tweet.text)
 
-        i = 1
-        time.sleep(5)
+    i = 1
+    time.sleep(5)
 
-        while True:
-            i += 1
-            print('pages：' + str(i))
-            try:
-                tweets = api.search(q=word, count=100, max_id=next_max_id-1)
+    while True:
+        i += 1
+        print('pages：' + str(i))
+        try:
+            tweets = api.search(q=query, count=count, max_id=next_max_id-1, wait_on_rate_limit=True)
 
-                for tweet in tweets:
-                    list_text.append(tweet.text)
+            for tweet in tweets:
+                list_text.append(tweet.text)
 
-            except tweepy.error.TweepError as tweeperror:
-                print(tweeperror)
-                time.sleep(60)
-                continue
+        except tweepy.error.TweepError as tweeperror:
+            print(tweeperror)
+            time.sleep(60)
+            continue
 
-            try:
-                next_max_id = tweets[-1].id
-                post_date = tweets[-1].created_at + datetime.timedelta(hours=+9)
+        try:
+            next_max_id = tweets[-1].id
+            post_date = tweets[-1].created_at + datetime.timedelta(hours=+9)
 
-            except IndexError as ie:
-                print(ie)
-                break
-                
-            if (post_date - now) > datetime.timedelta(days=10):
-                break
-            else:
-                time.sleep(3)
+        except IndexError as ie:
+            print(ie)
+            break
+            
+        if (post_date - now) > datetime.timedelta(days=3):
+            break
+        else:
+            time.sleep(3)
 
     list_tmp = []
 
+    # text
     for text in list_text:
         text_tmp = text
         text_tmp = re.sub('RT .*', '', text_tmp)
@@ -101,10 +103,9 @@ def get_twitter_message(words, count):
 #
     list_tmp = list(set(list_tmp))
     text = '\n'.join(list_tmp)
-#    print(text)
     return(text)
 
-#https://qiita.com/kawa-Kotaro/items/460977f050bf0e2828f2
+#
 def create_message(from_addr, to_addr, subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
@@ -122,12 +123,11 @@ def send_mail(from_addr, to_addr, body_msg):
     smtpobj.sendmail(MAIL_ADDRESS, to_addr, body_msg.as_string())
     smtpobj.close()
 
-def mail_loop():
+def mail_loop(q_words):
 
     m = MeCab.Tagger('-Ochasen')
     m.parse("")
 
-    q_words = ["#デマ"]
     count = 200
     text = get_twitter_message(q_words, count)
 
@@ -183,18 +183,33 @@ def tw_png(text, wc_filename):
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
     api = tweepy.API(auth)
-    api.update_with_media(filename=wc_filename,status=text)
+
+    while(True):
+        try:
+            api.update_with_media(filename=wc_filename,status=text)
+            break
+        except tweepy.TweepError as e:
+            if (e.reason == "[{'message': 'Rate limit exceeded', 'code': 88}]" 
+                or e.reason == "[{'message': 'Over capacity', 'code': 130}]"):
+
+                print('sleep in 15 minutes.)')
+                print(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+                time.sleep(60 * 15)
+
+            else:
+                break
 
 
 if __name__ == "__main__":
     while(True):
-        wc_words = mail_loop()
+        q_words = "＃映画"
+        wc_words = mail_loop(q_words)
         wc_filename = "wc.png"
         draw_wordcloud(wc_words, wc_filename)
 
         tdatetime = dt.now()
         str_ymd = tdatetime.strftime('%Y/%m/%d_%H:%M')
-        tw_text = str_ymd + " ハッシュタグ「デマ」で検索してできた言葉たち。（実験中） #ワードクラウド"
+        tw_text = str_ymd + " 「" + q_words + " 」で検索してできた言葉たち（実験中） #ワードクラウド"
         tw_png(tw_text, wc_filename)
         
         sleeptime = 3600 * 12
