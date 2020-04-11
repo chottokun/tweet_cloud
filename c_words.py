@@ -24,6 +24,9 @@ from email.utils import formatdate
 
 import time
 
+m = MeCab.Tagger('-Ochasen')
+m.parse("")
+
 #configuretion
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -48,7 +51,7 @@ def get_twitter_message(q_words, count):
     query = q_words
     now = datetime.datetime.now()
     #print(query)
-    tweets = api.search(q=query, result_type = 'recent', count=count)
+    tweets = api.search(q=query, result_type = 'recent', count=count, wait_on_rate_limit=True)
     next_max_id = tweets[-1].id
 
     for tweet in tweets:
@@ -74,15 +77,16 @@ def get_twitter_message(q_words, count):
         try:
             next_max_id = tweets[-1].id
             post_date = tweets[-1].created_at + datetime.timedelta(hours=+9)
+            print(post_date)
 
         except IndexError as ie:
             print(ie)
             break
             
-        if (post_date - now) > datetime.timedelta(days=3):
+        if (now - post_date) > datetime.timedelta(minutes=15):
             break
         else:
-            time.sleep(3)
+            time.sleep(1)
 
     list_tmp = []
 
@@ -125,8 +129,8 @@ def send_mail(from_addr, to_addr, body_msg):
 
 def mail_loop(q_words):
 
-    m = MeCab.Tagger('-Ochasen')
-    m.parse("")
+    # m = MeCab.Tagger('-Ochasen')
+    # m.parse("")
 
     count = 200
     text = get_twitter_message(q_words, count)
@@ -199,19 +203,42 @@ def tw_png(text, wc_filename):
             else:
                 break
 
+def get_trend_words():
+    #twitter auth.
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+    api = tweepy.API(auth)
+
+    #
+
+    results = api.trends_place(id = 23424856)
+    list_trend = []
+    for result in results:
+        for trend in result['trends']:
+            list_trend.append(trend['name'])
+
+    return list_trend
+
 
 if __name__ == "__main__":
-    while(True):
-        q_words = "＃映画"
-        wc_words = mail_loop(q_words)
-        wc_filename = "wc.png"
-        draw_wordcloud(wc_words, wc_filename)
 
+    while(True):
+
+        t_words = get_trend_words()
         tdatetime = dt.now()
-        str_ymd = tdatetime.strftime('%Y/%m/%d_%H:%M')
-        tw_text = str_ymd + " 「" + q_words + " 」で検索してできた言葉たち（実験中） #ワードクラウド"
-        tw_png(tw_text, wc_filename)
+        str_ymd = tdatetime.strftime('%m/%d_%H:%M')
         
-        sleeptime = 3600 * 12
+        for q_words in t_words:
+            #q_words = "大林監督"
+            print(q_words)
+            wc_words = mail_loop(q_words)
+            wc_filename = "wc.png"
+            draw_wordcloud(wc_words, wc_filename)
+            tw_text = " キーワード「 " + q_words + " 」１５分の言葉（実験中）#１５分のつぶやき #ワードクラウド " + str_ymd
+            tw_png(tw_text, wc_filename)
+
+            time.sleep(120)
+        
+        sleeptime = 3600 * 24
         print(str(sleeptime) + ' seconds')
         time.sleep(sleeptime)
