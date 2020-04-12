@@ -45,17 +45,17 @@ def get_twitter_message(q_words, count):
     #twitter auth.
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-    api = tweepy.API(auth)
+    api = tweepy.API(auth, wait_on_rate_limit = True)
     # search
     list_text = []
-    query = q_words
+    query = q_words + " exclude:retweets"
     now = datetime.datetime.now()
     #print(query)
-    tweets = api.search(q=query, result_type = 'recent', count=count, wait_on_rate_limit=True)
+    tweets = api.search(q=query, result_type = 'recent', count=count, tweet_mode="extended")
     next_max_id = tweets[-1].id
 
     for tweet in tweets:
-        list_text.append(tweet.text)
+        list_text.append(tweet.full_text)
 
     i = 1
     time.sleep(5)
@@ -64,10 +64,10 @@ def get_twitter_message(q_words, count):
         i += 1
         print('pages：' + str(i))
         try:
-            tweets = api.search(q=query, count=count, max_id=next_max_id-1, wait_on_rate_limit=True)
+            tweets = api.search(q=query, count=count, max_id=next_max_id-1, tweet_mode="extended")
 
             for tweet in tweets:
-                list_text.append(tweet.text)
+                list_text.append(tweet.full_text)
 
         except tweepy.error.TweepError as tweeperror:
             print(tweeperror)
@@ -83,15 +83,16 @@ def get_twitter_message(q_words, count):
             print(ie)
             break
             
-        if (now - post_date) > datetime.timedelta(minutes=15):
+        if (now - post_date) > datetime.timedelta(minutes=60):
             break
         else:
             time.sleep(1)
 
     list_tmp = []
-
+    text_count = 0
     # text
     for text in list_text:
+        text_count += 1
         text_tmp = text
         text_tmp = re.sub('RT .*', '', text_tmp)
         text_tmp = re.sub('@.*', '', text_tmp)
@@ -103,13 +104,12 @@ def get_twitter_message(q_words, count):
         text_tmp = text_tmp.strip()
         if text_tmp != '':
             list_tmp.append(text_tmp)
-
 #
     list_tmp = list(set(list_tmp))
     text = '\n'.join(list_tmp)
-    return(text)
-
+    return text, text_count
 #
+
 def create_message(from_addr, to_addr, subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
@@ -133,7 +133,8 @@ def mail_loop(q_words):
     # m.parse("")
 
     count = 200
-    text = get_twitter_message(q_words, count)
+    text, text_count = get_twitter_message(q_words, count)
+    print(q_words + str(text_count) + "行")
 
     # Parse To Node.
     node = m.parseToNode(text)
@@ -166,13 +167,14 @@ def mail_loop(q_words):
 
     # mail_text = json.dumps(count_twords)
 
-    with open(str_ymd + '.txt', 'w', encoding='utf-8',errors='ignore') as fw:
-        json.dump(count_twords, fw, indent=4, ensure_ascii=False)
+    # create json file
+    #with open(str_ymd + '.txt', 'w', encoding='utf-8',errors='ignore') as fw:
+    #    json.dump(count_twords, fw, indent=4, ensure_ascii=False)
 
     body_msg = create_message(MAIL_ADDRESS, MAIL_TO_ADDRESS, subject, text)
     send_mail(MAIL_ADDRESS, MAIL_TO_ADDRESS, body_msg)
 
-    return wc_words
+    return wc_words, text_count
 
 def draw_wordcloud(wc_words, wc_filename):
 
@@ -186,7 +188,7 @@ def tw_png(text, wc_filename):
     #twitter auth.
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-    api = tweepy.API(auth)
+    api = tweepy.API(auth, wait_on_rate_limit = True)
 
     while(True):
         try:
@@ -204,13 +206,11 @@ def tw_png(text, wc_filename):
                 break
 
 def get_trend_words():
-    #twitter auth.
+    #　twitter auth.
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
     api = tweepy.API(auth)
-
-    #
-
+    #　search JP trend.
     results = api.trends_place(id = 23424856)
     list_trend = []
     for result in results:
@@ -219,6 +219,9 @@ def get_trend_words():
 
     return list_trend
 
+#
+#   __main__
+#
 
 if __name__ == "__main__":
 
@@ -228,17 +231,23 @@ if __name__ == "__main__":
         tdatetime = dt.now()
         str_ymd = tdatetime.strftime('%m/%d_%H:%M')
         
+        l = 0
+
         for q_words in t_words:
-            #q_words = "大林監督"
+            #q_words = "ニュース"
             print(q_words)
-            wc_words = mail_loop(q_words)
+            wc_words, list_count = mail_loop(q_words)
             wc_filename = "wc.png"
             draw_wordcloud(wc_words, wc_filename)
-            tw_text = " キーワード「 " + q_words + " 」１５分の言葉（実験中）#１５分のつぶやき #ワードクラウド " + str_ymd
+            tw_text = " キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）　 ６０分の言葉（実験中）#６０分のつぶやき #ワードクラウド " + str_ymd
             tw_png(tw_text, wc_filename)
 
-            time.sleep(120)
+            l += 1
+            if l > 5:
+                break
+
+            time.sleep(180)
         
-        sleeptime = 3600 * 24
+        sleeptime = 3600 * 12
         print(str(sleeptime) + ' seconds')
         time.sleep(sleeptime)
