@@ -19,8 +19,14 @@ import matplotlib.pyplot as plt
 import os
 
 from datetime import datetime as dt
+
 from email.mime.text import MIMEText
 from email.utils import formatdate
+from email.header import Header
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.utils import formatdate
+from email import encoders
 
 import time
 
@@ -111,14 +117,24 @@ def get_twitter_message(q_words, count):
 #
 
 def create_message(from_addr, to_addr, subject, body):
-    msg = MIMEText(body)
+    msg = MIMEMultipart()
     msg['Subject'] = subject
     msg['From'] = from_addr
     msg['To'] = to_addr
     msg['Date'] = formatdate()
+    msg.attach(MIMEText(body))
     return msg
 
-def send_mail(from_addr, to_addr, body_msg):
+def send_mail(from_addr, to_addr, body_msg, attach_filename):
+
+    attachment = MIMEBase('image', 'png;name=\"' + attach_filename +'\"')
+    file = open(attach_filename,'rb') 
+    attachment.set_payload(file.read())
+    file.close()
+    encoders.encode_base64(attachment) # base64
+    attachment.add_header("Content-Dispositon","attachment",filename=attach_filename) 
+    body_msg.attach(attachment) 
+
     smtpobj = smtplib.SMTP(SMTP_SERVER, 587)
     smtpobj.ehlo()
     smtpobj.starttls()
@@ -161,18 +177,9 @@ def mail_loop(q_words):
     count_twords = collections.Counter(words)
     pprint.pprint(count_twords.most_common(100))
 
-    tdatetime = dt.now()
-    str_ymd = tdatetime.strftime('%Y%m%d%H%M%S')
-    subject = str_ymd
-
-    # mail_text = json.dumps(count_twords)
-
     # create json file
     #with open(str_ymd + '.txt', 'w', encoding='utf-8',errors='ignore') as fw:
     #    json.dump(count_twords, fw, indent=4, ensure_ascii=False)
-
-    body_msg = create_message(MAIL_ADDRESS, MAIL_TO_ADDRESS, subject, text)
-    send_mail(MAIL_ADDRESS, MAIL_TO_ADDRESS, body_msg)
 
     return wc_words, text_count
 
@@ -239,15 +246,21 @@ if __name__ == "__main__":
             wc_words, list_count = mail_loop(q_words)
             wc_filename = "wc.png"
             draw_wordcloud(wc_words, wc_filename)
-            tw_text = " キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）　 ６０分の言葉（実験中）#６０分のつぶやき #ワードクラウド " + str_ymd
-            tw_png(tw_text, wc_filename)
 
             l += 1
-            if l > 5:
+            if l > 4:
                 break
 
+            subject = "[ワードクラウド]　Twitterキーワード[" + q_words + "]" + "　" + str_ymd + "から60分のつぶやき雲"
+            text = " キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）によるワードクラウド。リツイートを覗いて可能な限り６０分間遡って収集。"
+            body_msg = create_message(MAIL_ADDRESS, MAIL_TO_ADDRESS, subject, text)
+            send_mail(MAIL_ADDRESS, MAIL_TO_ADDRESS, body_msg, wc_filename)
+
             time.sleep(180)
-        
+
+        tw_text = " 更新しました。　キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）　 ６０分の言葉（実験中）#６０分のつぶやき #ワードクラウド https://bwgift.hatenadiary.com/ " + str_ymd
+        tw_png(tw_text, wc_filename)
+
         sleeptime = 3600 * 12
         print(str(sleeptime) + ' seconds')
         time.sleep(sleeptime)
