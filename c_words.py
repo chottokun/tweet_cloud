@@ -30,8 +30,10 @@ from email import encoders
 
 import time
 
-m = MeCab.Tagger('-Ochasen')
-m.parse("")
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 
 #configuretion
 config = configparser.ConfigParser()
@@ -41,6 +43,8 @@ CONSUMER_KEY = config.get('twitter', 'CONSUMER_KEY')
 CONSUMER_SECRET = config.get('twitter', 'CONSUMER_SECRET')
 ACCESS_TOKEN = config.get('twitter', 'ACCESS_TOKEN')
 ACCESS_TOKEN_SECRET = config.get('twitter', 'ACCESS_TOKEN_SECRET')
+
+TWEET_TEXT = config.get('twitter', 'TWEET_TEXT')
 
 SMTP_SERVER = config.get('mail', 'SMTP_SERVER')
 MAIL_ADDRESS = config.get('mail', 'MAIL_ADDRESS')
@@ -68,7 +72,7 @@ def get_twitter_message(q_words, count):
 
     while True:
         i += 1
-        print('pages：' + str(i))
+        logging.info('pages：' + str(i))
         try:
             tweets = api.search(q=query, count=count, max_id=next_max_id-1, tweet_mode="extended")
 
@@ -76,17 +80,17 @@ def get_twitter_message(q_words, count):
                 list_text.append(tweet.full_text)
 
         except tweepy.error.TweepError as tweeperror:
-            print(tweeperror)
+            logging.error(tweeperror)
             time.sleep(60)
             continue
 
         try:
             next_max_id = tweets[-1].id
             post_date = tweets[-1].created_at + datetime.timedelta(hours=+9)
-            print(post_date)
+            logging.info(post_date)
 
         except IndexError as ie:
-            print(ie)
+            logging.error(ie)
             break
             
         if (now - post_date) > datetime.timedelta(minutes=60):
@@ -94,6 +98,10 @@ def get_twitter_message(q_words, count):
         else:
             time.sleep(1)
 
+    total_tweets_count = len(list_text)
+    logging.info('total ' + str(total_tweets_count) + ' tweets')
+
+    #
     list_tmp = []
     text_count = 0
     # text
@@ -145,12 +153,9 @@ def send_mail(from_addr, to_addr, body_msg, attach_filename):
 
 def mail_loop(q_words):
 
-    # m = MeCab.Tagger('-Ochasen')
-    # m.parse("")
-
     count = 200
     text, text_count = get_twitter_message(q_words, count)
-    print(q_words + str(text_count) + "行")
+    logging.info(q_words + str(text_count) + "行")
 
     # Parse To Node.
     node = m.parseToNode(text)
@@ -174,8 +179,8 @@ def mail_loop(q_words):
 
         node = node.next
 
-    count_twords = collections.Counter(words)
-    pprint.pprint(count_twords.most_common(100))
+#    count_twords = collections.Counter(words)
+#    pprint.pprint(count_twords.most_common(100))
 
     # create json file
     #with open(str_ymd + '.txt', 'w', encoding='utf-8',errors='ignore') as fw:
@@ -200,13 +205,14 @@ def tw_png(text, wc_filename):
     while(True):
         try:
             api.update_with_media(filename=wc_filename,status=text)
+            #api.update_status(text)
             break
         except tweepy.TweepError as e:
             if (e.reason == "[{'message': 'Rate limit exceeded', 'code': 88}]" 
                 or e.reason == "[{'message': 'Over capacity', 'code': 130}]"):
 
-                print('sleep in 15 minutes.)')
-                print(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+                logging.info('sleep in 15 minutes.)')
+                logging.info(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
                 time.sleep(60 * 15)
 
             else:
@@ -232,9 +238,14 @@ def get_trend_words():
 
 if __name__ == "__main__":
 
+    m = MeCab.Tagger('-Ochasen')
+    m.parse("")
+
     while(True):
 
         t_words = get_trend_words()
+
+        logging.info(t_words)
         tdatetime = dt.now()
         str_ymd = tdatetime.strftime('%m/%d_%H:%M')
         
@@ -242,7 +253,7 @@ if __name__ == "__main__":
 
         for q_words in t_words:
             #q_words = "ニュース"
-            print(q_words)
+            logging.info(q_words)
             wc_words, list_count = mail_loop(q_words)
             wc_filename = "wc.png"
             draw_wordcloud(wc_words, wc_filename)
@@ -256,11 +267,13 @@ if __name__ == "__main__":
             body_msg = create_message(MAIL_ADDRESS, MAIL_TO_ADDRESS, subject, text)
             send_mail(MAIL_ADDRESS, MAIL_TO_ADDRESS, body_msg, wc_filename)
 
-            time.sleep(180)
+            sleeptime = 120
+            logging.info(str(sleeptime) + ' seconds')
+            time.sleep(sleeptime)
 
-        tw_text = " 更新しました。　キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）　 ６０分の言葉（実験中）#６０分のつぶやき #ワードクラウド https://bwgift.hatenadiary.com/ " + str_ymd
+        tw_text = TWEET_TEXT + str_ymd
         tw_png(tw_text, wc_filename)
 
         sleeptime = 3600 * 12
-        print(str(sleeptime) + ' seconds')
+        logging.info(str(sleeptime) + ' seconds')
         time.sleep(sleeptime)
