@@ -60,7 +60,7 @@ def get_twitter_message(q_words, count):
     list_text = []
     query = q_words + " exclude:retweets"
     now = datetime.datetime.now()
-    #print(query)
+    # search tweets including query.
     tweets = api.search(q=query, result_type = 'recent', count=count, tweet_mode="extended")
     next_max_id = tweets[-1].id
 
@@ -93,7 +93,7 @@ def get_twitter_message(q_words, count):
             logging.error(ie)
             break
             
-        if (now - post_date) > datetime.timedelta(minutes=60):
+        if (i > 30000) or (now - post_date) > datetime.timedelta(minutes=60):
             break
         else:
             time.sleep(1)
@@ -104,7 +104,7 @@ def get_twitter_message(q_words, count):
     #
     list_tmp = []
     text_count = 0
-    # text
+    # cleansing.
     for text in list_text:
         text_count += 1
         text_tmp = text
@@ -118,9 +118,13 @@ def get_twitter_message(q_words, count):
         text_tmp = text_tmp.strip()
         if text_tmp != '':
             list_tmp.append(text_tmp)
-#
+    #
     list_tmp = list(set(list_tmp))
     text = '\n'.join(list_tmp)
+    # GC
+    del list_text
+    del list_tmp
+
     return text, text_count
 #
 
@@ -134,7 +138,7 @@ def create_message(from_addr, to_addr, subject, body):
     return msg
 
 def send_mail(from_addr, to_addr, body_msg, attach_filename):
-
+    # attach png file.
     attachment = MIMEBase('image', 'png;name=\"' + attach_filename +'\"')
     file = open(attach_filename,'rb') 
     attachment.set_payload(file.read())
@@ -142,7 +146,7 @@ def send_mail(from_addr, to_addr, body_msg, attach_filename):
     encoders.encode_base64(attachment) # base64
     attachment.add_header("Content-Dispositon","attachment",filename=attach_filename) 
     body_msg.attach(attachment) 
-
+    # sendmail.
     smtpobj = smtplib.SMTP(SMTP_SERVER, 587)
     smtpobj.ehlo()
     smtpobj.starttls()
@@ -150,6 +154,7 @@ def send_mail(from_addr, to_addr, body_msg, attach_filename):
     smtpobj.login(MAIL_ADDRESS, MAIL_PASSWORD)
     smtpobj.sendmail(MAIL_ADDRESS, to_addr, body_msg.as_string())
     smtpobj.close()
+    return
 
 def mail_loop(q_words):
 
@@ -244,23 +249,21 @@ if __name__ == "__main__":
     while(True):
 
         t_words = get_trend_words()
-
         logging.info(t_words)
-        tdatetime = dt.now()
-        str_ymd = tdatetime.strftime('%m/%d_%H:%M')
-        
+
+        # counter        
         l = 0
 
         for q_words in t_words:
             #q_words = "ニュース"
             logging.info(q_words)
+
+            tdatetime = dt.now()
+            str_ymd = tdatetime.strftime('%m/%d_%H:%M')
+
             wc_words, list_count = mail_loop(q_words)
             wc_filename = "wc.png"
             draw_wordcloud(wc_words, wc_filename)
-
-            l += 1
-            if l > 4:
-                break
 
             subject = "[ワードクラウド]　Twitterキーワード[" + q_words + "]" + "　" + str_ymd + "から60分のつぶやき雲"
             text = " キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）によるワードクラウド。リツイートを覗いて可能な限り６０分間遡って収集。"
@@ -271,7 +274,11 @@ if __name__ == "__main__":
             logging.info(str(sleeptime) + ' seconds')
             time.sleep(sleeptime)
 
-        tw_text = TWEET_TEXT + str_ymd
+            l += 1
+            if l > 9:
+                break
+
+        tw_text = TWEET_TEXT + " " + str_ymd
         tw_png(tw_text, wc_filename)
 
         sleeptime = 3600 * 12
