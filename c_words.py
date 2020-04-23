@@ -18,6 +18,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+import gc
+
 from datetime import datetime as dt
 
 from email.mime.text import MIMEText
@@ -93,13 +95,13 @@ def get_twitter_message(q_words, count):
             logging.error(ie)
             break
             
-        if (i > 30000) or (now - post_date) > datetime.timedelta(minutes=60):
+        if (i > 200) or ((now - post_date) > datetime.timedelta(minutes=60)):
             break
         else:
             time.sleep(1)
 
     total_tweets_count = len(list_text)
-    logging.info('total ' + str(total_tweets_count) + ' tweets')
+    logging.info('total ' + str(total_tweets_count) + ' tweets.')
 
     #
     list_tmp = []
@@ -263,6 +265,7 @@ if __name__ == "__main__":
 
             wc_words, list_count = mail_loop(q_words)
             wc_filename = "wc.png"
+            logging.info("drawing word cloud.")
             draw_wordcloud(wc_words, wc_filename)
 
             subject = "[ワードクラウド]　Twitterキーワード[" + q_words + "]" + "　" + str_ymd + "から60分のつぶやき雲"
@@ -270,7 +273,7 @@ if __name__ == "__main__":
             body_msg = create_message(MAIL_ADDRESS, MAIL_TO_ADDRESS, subject, text)
             send_mail(MAIL_ADDRESS, MAIL_TO_ADDRESS, body_msg, wc_filename)
 
-            sleeptime = 120
+            sleeptime = 30
             logging.info(str(sleeptime) + ' seconds')
             time.sleep(sleeptime)
 
@@ -281,6 +284,9 @@ if __name__ == "__main__":
         tw_text = TWEET_TEXT + " " + str_ymd
         tw_png(tw_text, wc_filename)
 
+        break
+    
+        gc.collect()
         sleeptime = 3600 * 12
         logging.info(str(sleeptime) + ' seconds')
         time.sleep(sleeptime)
