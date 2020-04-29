@@ -281,11 +281,11 @@ if __name__ == "__main__":
             if l > 9:
                 break
 
+        break
+
         tw_text = TWEET_TEXT + " " + str_ymd
         tw_png(tw_text, wc_filename)
 
-        break
-    
         gc.collect()
         sleeptime = 3600 * 12
         logging.info(str(sleeptime) + ' seconds')
