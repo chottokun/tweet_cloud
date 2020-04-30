@@ -96,7 +96,7 @@ def get_twitter_message(q_words, count):
             logging.error(ie)
             break
             
-        if (i > 200) or ((now - post_date) > datetime.timedelta(minutes=60)):
+        if (i > 99) or ((now - post_date) > datetime.timedelta(minutes=60)):
             break
         else:
             time.sleep(1)
@@ -268,9 +268,10 @@ if __name__ == "__main__":
             wc_filename = "wc.png"
             logging.info("drawing word cloud.")
             draw_wordcloud(wc_words, wc_filename)
+            gc.collect()
 
             subject = "[ワードクラウド]　Twitterキーワード[" + q_words + "]" + "　" + str_ymd + "から60分のつぶやき雲"
-            text = " キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）によるワードクラウド。リツイートを覗いて可能な限り６０分間遡って収集。"
+            text = " キーワード「 " + q_words + " 」（"+ str(list_count)+ " tweets）によるワードクラウド。リツイートを除いて最大６０分間もしくは１万ツイートまでさかのぼって収集"
             body_msg = create_message(MAIL_ADDRESS, MAIL_TO_ADDRESS, subject, text)
             send_mail(MAIL_ADDRESS, MAIL_TO_ADDRESS, body_msg, wc_filename)
 
