@@ -36,18 +36,19 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-
-#configuretion
+# configuretion
 config = configparser.ConfigParser()
 config.read('config.ini')
-
+#   twitter
 CONSUMER_KEY = config.get('twitter', 'CONSUMER_KEY')
 CONSUMER_SECRET = config.get('twitter', 'CONSUMER_SECRET')
 ACCESS_TOKEN = config.get('twitter', 'ACCESS_TOKEN')
 ACCESS_TOKEN_SECRET = config.get('twitter', 'ACCESS_TOKEN_SECRET')
-
+#   tweet
 TWEET_TEXT = config.get('twitter', 'TWEET_TEXT')
-
+#   word cloud
+WC_FONT_PATH = config.get('wordcloud','FONT_PATH')
+#   mail
 SMTP_SERVER = config.get('mail', 'SMTP_SERVER')
 MAIL_ADDRESS = config.get('mail', 'MAIL_ADDRESS')
 MAIL_PASSWORD = config.get('mail', 'MAIL_PASSWORD')
@@ -197,7 +198,7 @@ def mail_loop(q_words):
 
 def draw_wordcloud(wc_words, wc_filename):
 
-    wordc = WordCloud(font_path="/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+    wordc = WordCloud(font_path=WC_FONT_PATH,
         background_color='black',
         width=800,height=600)
     wordc.generate(wc_words)
