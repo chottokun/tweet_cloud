@@ -199,8 +199,12 @@ def mail_loop(q_words):
 def draw_wordcloud(wc_words, wc_filename):
 
     wordc = WordCloud(font_path=WC_FONT_PATH,
-        background_color='black',
-        width=800,height=600)
+        background_color='white',
+        colormap='Pastel1',
+        contour_width=2,
+        contour_color='black',
+        max_words=5000,
+        width=640,height=400)
     wordc.generate(wc_words)
     wordc.to_file(wc_filename)
 
@@ -280,7 +284,7 @@ if __name__ == "__main__":
             time.sleep(sleeptime)
 
             l += 1
-            if l > 9:
+            if l > 4:
                 break
 
         break
