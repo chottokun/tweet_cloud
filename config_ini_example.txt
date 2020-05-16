@@ -1,0 +1,21 @@
+# config.ini
+
+# keys
+
+[twitter]
+CONSUMER_KEY =
+CONSUMER_SECRET =
+ACCESS_TOKEN =
+ACCESS_TOKEN_SECRET =
+
+TWEET_TEXT =
+
+[wordcloud]
+FONT_PATH = /usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc
+
+[mail]
+SMTP_SERVER =
+MAIL_ADDRESS =
+MAIL_PASSWORD =
+MAIL_TO_ADDRESS =
+
